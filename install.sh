@@ -60,10 +60,13 @@ fi
 /usr/bin/plutil -create xml1 "$AGENT"
 /usr/bin/plutil -insert Label -string "$LABEL" "$AGENT"
 /usr/bin/plutil -insert ProgramArguments -xml \
-  "<array><string>/usr/bin/python3</string><string>$PAYLOAD</string><string>repair</string></array>" "$AGENT"
+  "<array><string>/usr/bin/python3</string><string>$PAYLOAD</string><string>startup</string></array>" "$AGENT"
 /usr/bin/plutil -insert RunAtLoad -bool true "$AGENT"
-/usr/bin/plutil -insert StartInterval -integer 900 "$AGENT"
+/usr/bin/plutil -insert StartInterval -integer 300 "$AGENT"
+/usr/bin/plutil -insert WatchPaths -xml \
+  "<array><string>$PREFS/com.apple.CloudSubscriptionFeatures.cache.plist</string><string>$PREFS/com.apple.CloudSubscriptionFeatures.waitlist.plist</string><string>$PREFS/com.apple.gms.availability.plist</string></array>" "$AGENT"
 /usr/bin/plutil -insert ProcessType -string Background "$AGENT"
+/usr/bin/plutil -insert LimitLoadToSessionType -string Aqua "$AGENT"
 /usr/bin/plutil -insert LowPriorityIO -bool true "$AGENT"
 /usr/bin/plutil -insert StandardOutPath -string "$SUPPORT_DIR/repair.log" "$AGENT"
 /usr/bin/plutil -insert StandardErrorPath -string "$SUPPORT_DIR/repair.log" "$AGENT"
@@ -72,10 +75,6 @@ fi
 /usr/bin/python3 "$PAYLOAD" repair
 /bin/launchctl bootstrap "$DOMAIN" "$AGENT"
 
-# Reload cached availability without opening or activating Siri AI.app. Apple's
-# com.apple.campo KeepAlive job restarts it as a background UI host.
-/usr/bin/killall "Siri AI" 2>/dev/null || true
-
-echo "SpotlightPlus 已安装：登录时及每 15 分钟自动维护 Enhanced Siri UI 状态。"
+echo "SpotlightPlus 已安装：登录时、状态文件变化时及每 5 分钟自动维护 Enhanced Siri UI 状态。"
 echo "安装过程未打开或激活 Siri AI.app，也未修改 SIP 或 /System。"
 echo "如需完整恢复安装前的用户设置，请运行 ./uninstall.sh。"

@@ -5,15 +5,20 @@ SpotlightPlus 是一个面向 macOS 27 的实验性工具，用于在正常地�
 它不会复制或重绘苹果界面，也不会替换 Spotlight。程序只维护 `GenerativeModels.Availability` 使用的当前用户偏好状态，实际界面仍由系统自带的 `com.apple.campo` 和 `CampoUIInternal.MacAssistantIslandCoordinator` 呈现。
 
 > [!WARNING]
-> 本项目使用未公开且可能随系统更新改变的内部状态，仅在 macOS 27.0 `26A428` 上验证。它只能开放界面门控，不能绕过地区服务限制、下载缺失模型或保证 Siri/Apple Intelligence 的实际请求可用。
+> 本项目使用未公开且可能随系统更新改变的内部状态，目前仅在作者本机的 macOS 27.0 `26A428` 上完成实验，尚未在其他 Mac、硬件型号或系统 build 上验证。它只能开放界面门控，不能绕过地区服务限制、下载缺失模型或保证 Siri/Apple Intelligence 的实际请求可用。欢迎在 [Issues](https://github.com/alanmacX/SpotlightPlus/issues) 报告其他设备上的结果和问题。
+
+> [!IMPORTANT]
+> 开机登录后，新 UI 不会立即出现。系统需要先完成 GMS 和 Campo 初始化，SpotlightPlus 通常需要约一分钟才能重新 patch 并切回新版 UI；此时无需手动打开 Siri AI.app。不同机器的等待时间可能略有差异。
 
 ## 实现效果
 
 - 使用苹果原生新版 Assistant Island 界面；
 - 不打开 Siri AI.app 的普通主窗口；
 - Siri AI.app 仅作为苹果系统后台 UI 宿主存在；
-- 登录时自动修复一次状态；
-- 每 15 分钟检查一次，只有状态回退时才重新写入并发送通知；
+- 登录到桌面后等待 Campo 就绪，自动修复状态并在后台重启一次，使其重新选择新版 coordinator；
+- 登录后的前三分钟每两秒检查文件时间戳，只有发生变化才读取和修复状态，用于捕获 GMS/Campo 延迟初始化造成的二次覆盖；
+- 状态文件变化时立即检查，另有每 5 分钟一次的兜底检查；
+- 登录后的运行中，只有状态实际回退时才再次重启 Campo；
 - 全程保持 SIP 开启；
 - 不需要管理员权限。
 
@@ -61,9 +66,9 @@ chmod +x install.sh uninstall.sh
 2. 安装状态修复程序；
 3. 创建当前用户 LaunchAgent；
 4. 立即应用一次状态；
-5. 让系统自行在后台重新拉起 `com.apple.campo`，不会打开 Siri AI 主窗口。
+5. 通过系统 LaunchAgent 在后台重启 `com.apple.campo`，不会打开 Siri AI 主窗口。
 
-安装完成后不需要手动打开任何 App。LaunchAgent 会在下次登录时自动运行。
+安装完成后不需要手动打开任何 App。LaunchAgent 会在下次登录时自动运行；开机进入桌面后请等待约一分钟，再使用快捷键唤出新版 UI。
 
 ## 使用方法
 
@@ -90,7 +95,7 @@ user_unifiedReasons=[]
 byhost_availability=True
 ```
 
-LaunchAgent 执行完毕后显示 `state = not running` 是正常现象：它是定时任务，不是常驻进程。
+开机登录后的前三分钟，LaunchAgent 会短暂显示为运行中，用于消除系统服务初始化顺序造成的竞争。新版 UI 通常会在约一分钟内恢复。预热结束后显示 `state = not running` 是正常现象：它仍会由状态文件变化和五分钟兜底计时触发，并非常驻进程。
 
 ## 卸载与恢复
 
