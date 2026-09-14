@@ -86,6 +86,17 @@ chmod +x install.sh uninstall.sh
 tail -f "$HOME/Library/Application Support/SpotlightPlus/repair.log"
 ```
 
+如果新版 UI 没有出现，生成一份只读诊断报告：
+
+```bash
+chmod +x diagnose.sh
+./diagnose.sh
+```
+
+脚本会在当前目录生成 `SpotlightPlus-diagnostics-日期时间.txt`。提交 [Issue](https://github.com/alanmacX/SpotlightPlus/issues) 时请附上该文件，并填写报告末尾的实际界面、登录后等待时间和复现步骤。
+
+诊断脚本不会修改系统或 SpotlightPlus 状态，不会自动上传数据，也不会收集序列号、Apple Account、Siri 查询内容、偏好文件内容或系统统一日志。用户名和用户目录会在输出中自动替换；提交前仍建议自行检查报告内容。
+
 正常稳定状态会显示：
 
 ```text
