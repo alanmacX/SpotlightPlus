@@ -19,8 +19,9 @@ SpotlightPlus 是一个面向 macOS 27 的实验性工具，用于在正常地�
 - 登录后的前三分钟每两秒检查文件时间戳，只有发生变化才读取和修复状态，用于捕获 GMS/Campo 延迟初始化造成的二次覆盖；
 - 状态文件变化时立即检查，另有每 5 分钟一次的兜底检查；
 - 登录后的运行中，只有状态实际回退时才再次重启 Campo；
+- 关闭文本选区上下文菜单中的实验性 `Ask Siri` 浮动输入框，避免其远程视图失败后阻塞 AppKit 菜单和手势；
 - 全程保持 SIP 开启；
-- 不需要管理员权限。
+- 安装和卸载各需要一次管理员密码，仅用于维护可恢复的 `/Library/Preferences/FeatureFlags/Domain/WritingTools.plist` 覆盖。
 
 ## 修改范围
 
@@ -32,6 +33,7 @@ SpotlightPlus 只修改当前用户目录下与 Enhanced Siri 可用性有关的
 - 从 ByHost 偏好中移除 `com.apple.Siri.EnhancedSiriDisablement`；
 - 标记 Enhanced Siri 偏好为启用；
 - 发布苹果已有的 availability Darwin notifications。
+- 将 `WritingTools / LightweightUI_macOS` 独立设为关闭；这不会关闭 Spotlight Assistant Island。
 
 它不会：
 
@@ -60,13 +62,16 @@ chmod +x install.sh uninstall.sh
 ./install.sh
 ```
 
+安装过程中会要求一次管理员密码，用来关闭系统范围的文本选区 `Ask Siri` 浮动界面。该设置位于可写数据卷的 `/Library/Preferences`，不需要关闭 SIP，也不会修改封印系统卷。
+
 安装器会：
 
 1. 在 `~/Library/Application Support/SpotlightPlus/Original` 保存逐文件原始快照；
-2. 安装状态修复程序；
-3. 创建当前用户 LaunchAgent；
-4. 立即应用一次状态；
-5. 通过系统 LaunchAgent 在后台重启 `com.apple.campo`，不会打开 Siri AI 主窗口。
+2. 备份原始 `WritingTools.plist`（包括“原本不存在”的状态），并关闭 `LightweightUI_macOS`；
+3. 安装状态修复程序；
+4. 创建当前用户 LaunchAgent；
+5. 立即应用一次状态；
+6. 通过系统 LaunchAgent 在后台重启 `com.apple.campo`，不会打开 Siri AI 主窗口。
 
 安装完成后不需要手动打开任何 App。LaunchAgent 会在下次登录时自动运行；开机进入桌面后请等待约一分钟，再使用快捷键唤出新版 UI。
 
@@ -104,6 +109,7 @@ changed=no
 cache_canUse=True
 user_unifiedReasons=[]
 byhost_availability=True
+WritingTools.LightweightUI_macOS.Enabled=false
 ```
 
 开机登录后的前三分钟，LaunchAgent 会短暂显示为运行中，用于消除系统服务初始化顺序造成的竞争。新版 UI 通常会在约一分钟内恢复。预热结束后显示 `state = not running` 是正常现象：它仍会由状态文件变化和五分钟兜底计时触发，并非常驻进程。
@@ -123,7 +129,8 @@ byhost_availability=True
 3. 删除安装时原本不存在、后来才创建的目标文件；
 4. 发布可用性变更通知；
 5. 让系统后台 Campo 重新读取恢复后的状态；
-6. 删除 SpotlightPlus 安装目录和备份。
+6. 恢复安装前完整的 `WritingTools.plist`，或在它原本不存在时移除本项目创建的文件；
+7. 删除 SpotlightPlus 安装目录和备份。
 
 卸载脚本会先检查备份完整性。如果缺少备份，它会拒绝继续，避免把用户设置恢复成未知状态。
 
@@ -134,6 +141,10 @@ byhost_availability=True
 ```
 
 如果你曾通过其他方法修改该文件，SpotlightPlus 不会在卸载时擅自删除，因为项目不知道它修改前的原值。
+
+`WritingTools / LightweightUI_macOS` 不属于 Spotlight UI 本体，但 Enhanced Siri 总可用性会把它一并暴露。它使用 `CampoRemoteService` 在每个 App 的菜单中嵌入远程输入框；在模型或建议服务不可用的机器上，该视图可能导致菜单和手势跟踪卡住。因此 SpotlightPlus 默认关闭它，只保留 Spotlight Assistant Island。
+
+如果安装过旧版并遇到菜单、Dock、任务控制或网页交互卡住，请先在终端运行最新版 `./install.sh`，然后重新登录或重启。不要点击右键菜单顶部的 `Ask Siri` 输入框；新版安装器会关闭并隔离该入口。
 
 ## 已知问题：语音按钮
 

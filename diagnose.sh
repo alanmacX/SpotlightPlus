@@ -138,6 +138,22 @@ else
   print "missing-or-inaccessible-without-elevated-permission"
 fi
 
+section "Text-selection Ask Siri isolation"
+WRITING_TOOLS_FLAG="/Library/Preferences/FeatureFlags/Domain/WritingTools.plist"
+raw_value=$(/usr/bin/defaults read \
+  "/Library/Preferences/FeatureFlags/Domain/WritingTools" LightweightUI_macOS 2>/dev/null) \
+  || raw_value=""
+value=$(print -r -- "$raw_value" | /usr/bin/awk '/Enabled/ { gsub(/[^01]/, "", $0); print; exit }')
+if [[ "$value" == "0" ]]; then
+  print "WritingTools.LightweightUI_macOS.Enabled=false"
+elif [[ "$value" == "1" ]]; then
+  print "WritingTools.LightweightUI_macOS.Enabled=true"
+elif [[ -e "$WRITING_TOOLS_FLAG" ]]; then
+  print "WritingTools.LightweightUI_macOS.Enabled=<missing-or-unreadable>"
+else
+  print "WritingTools.plist=absent"
+fi
+
 section "SpotlightPlus repair log (last 100 lines)"
 if [[ -f "$SUPPORT_DIR/repair.log" ]]; then
   /usr/bin/tail -n 100 "$SUPPORT_DIR/repair.log"

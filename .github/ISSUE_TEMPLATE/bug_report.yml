@@ -20,7 +20,19 @@ body:
         - 没有任何界面
         - 小型 Ask Siri 界面
         - 新版 Assistant Island，但行为异常
+        - 菜单、Dock、任务控制或 App 交互卡住
         - 其他
+    validations:
+      required: true
+
+  - type: dropdown
+    id: contextual_ask_siri
+    attributes:
+      label: 选中文字并打开右键菜单时，顶部是否出现 Ask Siri 输入框
+      options:
+        - 否
+        - 是
+        - 未测试
     validations:
       required: true
 
