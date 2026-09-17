@@ -10,6 +10,9 @@ SpotlightPlus 是一个面向 macOS 27 的实验性工具，用于在正常地�
 > [!IMPORTANT]
 > 开机登录后，新 UI 不会立即出现。系统需要先完成 GMS 和 Campo 初始化，SpotlightPlus 通常需要约一分钟才能重新 patch 并切回新版 UI；此时无需手动打开 Siri AI.app。不同机器的等待时间可能略有差异。
 
+> [!IMPORTANT]
+> **不要退出或强制退出 `Siri AI.app` 进程。**它虽然不必显示主窗口，却是新版 Spotlight 的后台 UI 宿主；在 macOS 27.2 beta 1 上，手动 Quit 后系统不一定自动拉起它，可能导致 `⌘ Space` 无法打开 Spotlight。关闭 Siri 主窗口与退出整个进程不是一回事。如果误退出，在终端运行 `launchctl kickstart "gui/$(id -u)/com.apple.campo"`，无需关闭 SIP。
+
 ## 实现效果
 
 - 使用苹果原生新版 Assistant Island 界面；
@@ -75,6 +78,8 @@ chmod +x install.sh uninstall.sh
 
 安装完成后不需要手动打开任何 App。LaunchAgent 会在下次登录时自动运行；开机进入桌面后请等待约一分钟，再使用快捷键唤出新版 UI。
 
+使用期间请让系统自带的 `Siri AI.app` 进程留在后台。SpotlightPlus 会在必要时自行重启 Campo 以刷新状态，但不会持续监控你手动 Quit 它的操作。
+
 ## 使用方法
 
 使用系统已经设置的 Siri/键入 Siri 快捷键唤出 Assistant Island。项目不会自行修改你的键盘快捷键。
@@ -90,6 +95,14 @@ chmod +x install.sh uninstall.sh
 ```bash
 tail -f "$HOME/Library/Application Support/SpotlightPlus/repair.log"
 ```
+
+如果曾手动退出 `Siri AI.app`，导致 Spotlight 完全打不开，可以在终端后台重新启动它：
+
+```bash
+launchctl kickstart "gui/$(id -u)/com.apple.campo"
+```
+
+此命令不会打开 Siri 主窗口，也不需要关闭 SIP。
 
 如果新版 UI 没有出现，生成一份只读诊断报告：
 
