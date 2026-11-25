@@ -1,187 +1,62 @@
 # SpotlightPlus
 
-SpotlightPlus 是一个面向 macOS 27 的实验性工具，用于在正常地区可用性缓存会选择旧版界面的设备上，维持苹果原生 Enhanced Siri Assistant Island 界面。
+SpotlightPlus 让 macOS 27 使用苹果原生的新版 Spotlight（Assistant Island）。界面由系统的 `com.apple.campo` 进程显示。这个项目能让新版搜索框出现；Siri AI、千问和模型下载仍由 macOS 管理。
 
-它不会复制或重绘苹果界面，也不会替换 Spotlight。程序只维护 `GenerativeModels.Availability` 使用的当前用户偏好状态，实际界面仍由系统自带的 `com.apple.campo` 和 `CampoUIInternal.MacAssistantIslandCoordinator` 呈现。
+## 实测结果
 
-> [!WARNING]
-> 本项目使用未公开且可能随系统更新改变的内部状态，目前仅在作者本机的 macOS 27.0 `26A428` 上完成实验，尚未在其他 Mac、硬件型号或系统 build 上验证。它只能开放界面门控，不能绕过地区服务限制、下载缺失模型或保证 Siri/Apple Intelligence 的实际请求可用。欢迎在 [Issues](https://github.com/alanmacX/SpotlightPlus/issues) 报告其他设备上的结果和问题。
+| 功能 | macOS 27.3 beta（`26C5047e`），国行配置 |
+| --- | --- |
+| 新版 Spotlight | 能打开。手动退出后台的 Siri AI 进程后，快捷键可能失效。 |
+| 写作工具、照片「消除」 | 在实验配置中验证过原生校对和「消除」模型加载。写作工具的「创作」也成功用千问回答了测试问题。 |
+| Spotlight 的 `Ask Qwen` | 菜单项能显示，点选后没有收到千问回复。 |
+| 经典 Siri 转交千问 | 本次英文测试返回了百度搜索结果。 |
+| Siri AI 会话 | 系统显示不可用。仅安装 SpotlightPlus 无法恢复会话或更换模型。 |
 
-> [!IMPORTANT]
-> 开机登录后，新 UI 不会立即出现。系统需要先完成 GMS 和 Campo 初始化，SpotlightPlus 通常需要约一分钟才能重新 patch 并切回新版 UI；此时无需手动打开 Siri AI.app。不同机器的等待时间可能略有差异。
+新版搜索框最初在 macOS 27.0 `26A428` 上验证。上表是同一台测试 Mac 的结果，其中写作工具和照片测试使用了本地实验配置，当前安装脚本未包含该配置。[调研记录](RESEARCH.md#macos-273-beta-复测)里列了复测细节。
 
-> [!IMPORTANT]
-> **不要退出或强制退出 `Siri AI.app` 进程。**它虽然不必显示主窗口，却是新版 Spotlight 的后台 UI 宿主；在 macOS 27.2 beta 1 上，手动 Quit 后系统不一定自动拉起它，可能导致 `⌘ Space` 无法打开 Spotlight。关闭 Siri 主窗口与退出整个进程不是一回事。如果误退出，在终端运行 `launchctl kickstart "gui/$(id -u)/com.apple.campo"`，无需关闭 SIP。
+## 安装
 
-## 实现效果
+需要 macOS 27 或更新版本、系统的 `/usr/bin/python3`，以及能正常启动的基础 Siri。
 
-- 使用苹果原生新版 Assistant Island 界面；
-- 不打开 Siri AI.app 的普通主窗口；
-- Siri AI.app 仅作为苹果系统后台 UI 宿主存在；
-- 登录到桌面后等待 Campo 就绪，自动修复状态并在后台重启一次，使其重新选择新版 coordinator；
-- 登录后的前三分钟每两秒检查文件时间戳，只有发生变化才读取和修复状态，用于捕获 GMS/Campo 延迟初始化造成的二次覆盖；
-- 状态文件变化时立即检查，另有每 5 分钟一次的兜底检查；
-- 登录后的运行中，只有状态实际回退时才再次重启 Campo；
-- 关闭文本选区上下文菜单中的实验性 `Ask Siri` 浮动输入框，避免其远程视图失败后阻塞 AppKit 菜单和手势；
-- 全程保持 SIP 开启；
-- 安装和卸载各需要一次管理员密码，仅用于维护可恢复的 `/Library/Preferences/FeatureFlags/Domain/WritingTools.plist` 覆盖。
-
-## 修改范围
-
-SpotlightPlus 只修改当前用户目录下与 Enhanced Siri 可用性有关的偏好：
-
-- 将缓存中的 `ai.enhanced-siri` 标记为可用，有效期滚动维持为 7 天；
-- 将对应的 CloudSubscription waitlist 项设为 `active`；
-- 清除当前用户 GMS 拒绝原因；
-- 从 ByHost 偏好中移除 `com.apple.Siri.EnhancedSiriDisablement`；
-- 标记 Enhanced Siri 偏好为启用；
-- 发布苹果已有的 availability Darwin notifications。
-- 将 `WritingTools / LightweightUI_macOS` 独立设为关闭；这不会关闭 Spotlight Assistant Island。
-
-它不会：
-
-- 关闭或修改 SIP；
-- 写入 `/System`；
-- 修改 eligibility 数据库；
-- 安装 kext、系统扩展或注入代码；
-- 执行 `open Siri AI.app`；
-- 接管 Command–Space 全局快捷键；
-- 自动提交文字、语音或 AI 请求。
-
-## 系统要求
-
-- macOS 27 或更高版本；
-- 系统自带 `/usr/bin/python3`；
-- 当前用户能够正常使用基础 Siri；
-- 建议先退出其他用于强开 Siri/Apple Intelligence 的工具，避免偏好互相覆盖。
-
-## 安装方法
-
-在 Terminal 中进入仓库目录：
+在仓库目录运行：
 
 ```bash
-cd SpotlightPlus
-chmod +x install.sh uninstall.sh
 ./install.sh
 ```
 
-安装过程中会要求一次管理员密码，用来关闭系统范围的文本选区 `Ask Siri` 浮动界面。该设置位于可写数据卷的 `/Library/Preferences`，不需要关闭 SIP，也不会修改封印系统卷。
+安装脚本会备份原有偏好，安装当前用户的 LaunchAgent。它还会请求管理员权限，在 `/Library/Preferences/FeatureFlags/Domain/WritingTools.plist` 关闭实验性的文本选区 Ask Siri 输入框，避免这个浮层卡住 App 菜单。Spotlight 搜索框仍可使用。脚本不需要关闭 SIP，也不会修改 `/System`。
 
-安装器会：
-
-1. 在 `~/Library/Application Support/SpotlightPlus/Original` 保存逐文件原始快照；
-2. 备份原始 `WritingTools.plist`（包括“原本不存在”的状态），并关闭 `LightweightUI_macOS`；
-3. 安装状态修复程序；
-4. 创建当前用户 LaunchAgent；
-5. 立即应用一次状态；
-6. 通过系统 LaunchAgent 在后台重启 `com.apple.campo`，不会打开 Siri AI 主窗口。
-
-安装完成后不需要手动打开任何 App。LaunchAgent 会在下次登录时自动运行；开机进入桌面后请等待约一分钟，再使用快捷键唤出新版 UI。
-
-使用期间请让系统自带的 `Siri AI.app` 进程留在后台。SpotlightPlus 会在必要时自行重启 Campo 以刷新状态，但不会持续监控你手动 Quit 它的操作。
-
-## 使用方法
-
-使用系统已经设置的 Siri/键入 Siri 快捷键唤出 Assistant Island。项目不会自行修改你的键盘快捷键。
-
-查看当前维护状态：
-
-```bash
-/usr/bin/python3 "$HOME/Library/Application Support/SpotlightPlus/state_tool.py" status
-```
-
-查看自动修复日志：
-
-```bash
-tail -f "$HOME/Library/Application Support/SpotlightPlus/repair.log"
-```
-
-如果曾手动退出 `Siri AI.app`，导致 Spotlight 完全打不开，可以在终端后台重新启动它：
+登录后通常等约一分钟，再按系统原有的 Spotlight 快捷键（默认 `⌘Space`）。启动较慢时，可以等到三分钟。可以关闭 Siri AI 的主窗口，请保留后台进程；退出进程后如果快捷键失效，用下面这条命令重新启动系统任务：
 
 ```bash
 launchctl kickstart "gui/$(id -u)/com.apple.campo"
 ```
 
-此命令不会打开 Siri 主窗口，也不需要关闭 SIP。
+## 排查问题
 
-如果新版 UI 没有出现，生成一份只读诊断报告：
+- **按快捷键没弹窗，或总是旧版。** 等登录满三分钟，运行 `./diagnose.sh`。如果刚退出过 Siri AI，先用上面的命令启动后台进程。
+- **新版能打开，`Ask Qwen` 或 `Ask Siri` 没答复。** 提交 Issue 时写清是哪一项、能否输入、点下去后是卡住还是出现提示。「创作」是否能用千问也一起注明。
+- **选中文字后，右键菜单或 App 界面卡住。** 更新到最新版本，重新登录或重启，让安装脚本的写作工具设置生效。
+
+诊断报告只记录系统版本、进程和安装状态、少量布尔设置，并留出位置让你填写实际表现。脚本不会上传报告。贴到 [Issues](https://github.com/alanmacX/SpotlightPlus/issues) 前请先检查内容。
+
+如需在本机看维护状态和完整日志：
 
 ```bash
-chmod +x diagnose.sh
-./diagnose.sh
+/usr/bin/python3 "$HOME/Library/Application Support/SpotlightPlus/state_tool.py" status
+tail -f "$HOME/Library/Application Support/SpotlightPlus/repair.log"
 ```
 
-脚本会在当前目录生成 `SpotlightPlus-diagnostics-日期时间.txt`。提交 [Issue](https://github.com/alanmacX/SpotlightPlus/issues) 时请附上该文件，并填写报告末尾的实际界面、登录后等待时间和复现步骤。
+LaunchAgent 平时可以显示 `not running`；它会在登录、相关文件变化或五分钟定时检查时运行。
 
-诊断脚本不会修改系统或 SpotlightPlus 状态，不会自动上传数据，也不会收集序列号、Apple Account、Siri 查询内容、偏好文件内容或系统统一日志。用户名和用户目录会在输出中自动替换；提交前仍建议自行检查报告内容。
-
-正常稳定状态会显示：
-
-```text
-changed=no
-cache_canUse=True
-user_unifiedReasons=[]
-byhost_availability=True
-WritingTools.LightweightUI_macOS.Enabled=false
-```
-
-开机登录后的前三分钟，LaunchAgent 会短暂显示为运行中，用于消除系统服务初始化顺序造成的竞争。新版 UI 通常会在约一分钟内恢复。预热结束后显示 `state = not running` 是正常现象：它仍会由状态文件变化和五分钟兜底计时触发，并非常驻进程。
-
-## 卸载与恢复
-
-在仓库目录运行：
+## 卸载
 
 ```bash
 ./uninstall.sh
 ```
 
-卸载器会：
-
-1. 停止并移除 LaunchAgent；
-2. 恢复安装时存在的全部用户偏好文件；
-3. 删除安装时原本不存在、后来才创建的目标文件；
-4. 发布可用性变更通知；
-5. 让系统后台 Campo 重新读取恢复后的状态；
-6. 恢复安装前完整的 `WritingTools.plist`，或在它原本不存在时移除本项目创建的文件；
-7. 删除 SpotlightPlus 安装目录和备份。
-
-卸载脚本会先检查备份完整性。如果缺少备份，它会拒绝继续，避免把用户设置恢复成未知状态。
-
-本项目不会创建或管理以下管理员级 Feature Flag：
-
-```text
-/Library/Preferences/FeatureFlags/Domain/SpotlightUI.plist
-```
-
-如果你曾通过其他方法修改该文件，SpotlightPlus 不会在卸载时擅自删除，因为项目不知道它修改前的原值。
-
-`WritingTools / LightweightUI_macOS` 不属于 Spotlight UI 本体，但 Enhanced Siri 总可用性会把它一并暴露。它使用 `CampoRemoteService` 在每个 App 的菜单中嵌入远程输入框；在模型或建议服务不可用的机器上，该视图可能导致菜单和手势跟踪卡住。因此 SpotlightPlus 默认关闭它，只保留 Spotlight Assistant Island。
-
-如果安装过旧版并遇到菜单、Dock、任务控制或网页交互卡住，请先在终端运行最新版 `./install.sh`，然后重新登录或重启。不要点击右键菜单顶部的 `Ask Siri` 输入框；新版安装器会关闭并隔离该入口。
-
-## 已知问题：语音按钮
-
-当前机器上点击语音按钮时，界面能够进入 `siri(listening)`，但真实 Siri 会话随即失败：
-
-```text
-ChatService submit error: siriUnavailable
-Failed to start voice recording
-assistant_cdmd: Assets are missing
-Query Understanding / EmbeddingService load failed
-```
-
-日志中没有在失败前出现麦克风/TCC 拒绝，因此问题不是简单的麦克风权限，而是 UI 已开放、真实 Siri 编排服务或模型资产仍不可用。当前版本不会尝试伪造 Voice、Thinking 或 Canvas 状态。
-
-更详细的逆向结果见 [RESEARCH.md](RESEARCH.md)。
-
-## 安全与隐私
-
-- 脚本只在本机运行；
-- 不包含网络请求；
-- 不上传提示词、语音、日志或偏好文件；
-- 仓库不包含任何苹果二进制、框架、模型或资源文件；
-- 安装备份保存在用户本机，不应提交到 Git。
+卸载脚本会先检查安装备份，再停止 LaunchAgent，恢复用户偏好和安装前的 `WritingTools.plist`，最后移除安装目录。备份缺失时会停止。`/Library/Preferences/FeatureFlags/Domain/SpotlightUI.plist` 由其他工具管理时，SpotlightPlus 不会动它。
 
 ## 许可证
 
-本项目代码采用 MIT License。Apple、Siri、Spotlight、Apple Intelligence、Campo 等名称和系统组件归 Apple Inc. 所有。
+[MIT](LICENSE)。Apple、Siri、Spotlight 与 Apple Intelligence 是苹果的产品或组件。本仓库不分发苹果系统二进制或模型。

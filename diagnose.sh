@@ -32,17 +32,22 @@ section() {
   print "===== $1 ====="
 }
 
-read_default() {
+read_boolean_default() {
   local domain=$1
   local key=$2
   local value
   value=$(/usr/bin/defaults read "$domain" "$key" 2>/dev/null) || value="<missing>"
+  case "$value" in
+    1|true) value=true ;;
+    0|false) value=false ;;
+    *) value='<missing-or-not-boolean>' ;;
+  esac
   print "$domain.$key=$value"
 }
 
 print "SpotlightPlus diagnostic report"
 print "generated=$(/bin/date -u '+%Y-%m-%dT%H:%M:%SZ')"
-print "privacy=No serial number, Apple Account, Siri query, preference contents, or unified logs collected"
+print "privacy=No serial number, Apple Account, Siri query, raw preferences, or logs collected"
 
 section "System"
 /usr/bin/sw_vers 2>&1
@@ -51,7 +56,6 @@ print "hardware_model=$(/usr/sbin/sysctl -n hw.model 2>/dev/null || print '<unav
 print "boot_time=$(/usr/sbin/sysctl -n kern.boottime 2>/dev/null || print '<unavailable>')"
 print "uptime=$(/usr/bin/uptime 2>/dev/null || print '<unavailable>')"
 /usr/bin/csrutil status 2>&1 || true
-read_default NSGlobalDomain AppleLocale
 
 section "Apple UI host"
 CAMPO_APP="/System/Applications/Siri AI.app"
@@ -63,10 +67,11 @@ else
   print "campo_app=missing"
 fi
 
-CAMPO_PID=$(/usr/bin/pgrep -x "Siri AI" | /usr/bin/head -n 1)
+CAMPO_PID=$(/bin/launchctl print "$DOMAIN/com.apple.campo" 2>/dev/null | \
+  /usr/bin/awk '$1 == "pid" && $2 == "=" && $3 ~ /^[0-9]+$/ {print $3; exit}')
 if [[ -n "$CAMPO_PID" ]]; then
   print "campo_process=running"
-  /bin/ps -p "$CAMPO_PID" -o pid=,rss=,%cpu=,etime=,comm=
+  /bin/ps -p "$CAMPO_PID" -o pid=,rss=,%cpu=,etime=
 else
   print "campo_process=not-running"
 fi
@@ -89,10 +94,6 @@ if [[ -f "$AGENT" ]]; then
     value=$(/usr/libexec/PlistBuddy -c "Print :$key" "$AGENT" 2>/dev/null) || value="<missing>"
     print "$key=$value"
   done
-  command=$(/usr/libexec/PlistBuddy -c 'Print :ProgramArguments:2' "$AGENT" 2>/dev/null) || command="<missing>"
-  print "command=$command"
-  print "WatchPaths:"
-  /usr/libexec/PlistBuddy -c 'Print :WatchPaths' "$AGENT" 2>/dev/null || print "<missing>"
 else
   print "LaunchAgent plist is not installed"
 fi
@@ -100,16 +101,10 @@ fi
 /bin/launchctl print "$DOMAIN/$LABEL" 2>&1 | \
   /usr/bin/grep -E '^[[:space:]]*(state|runs|last exit code|run interval) =' || true
 
-section "Maintained state"
-if [[ -f "$PAYLOAD" ]]; then
-  /usr/bin/python3 "$PAYLOAD" status 2>&1 || print "state_tool_status=failed:$?"
-else
-  print "state_tool_status=unavailable"
-fi
-read_default com.apple.siri GMSignedUp
-read_default com.apple.siri.generativeassistantsettings isEnabled
-read_default com.apple.siri TypeToSiriEnabled
-read_default com.apple.siri KeyboardShortcutSAE
+section "Siri preferences (booleans only)"
+read_boolean_default com.apple.siri GMSignedUp
+read_boolean_default com.apple.siri.generativeassistantsettings isEnabled
+read_boolean_default com.apple.siri TypeToSiriEnabled
 
 section "Relevant files"
 files=(
@@ -131,7 +126,7 @@ done
 section "SpotlightUI Feature Flag"
 FLAG="/Library/Preferences/FeatureFlags/Domain/SpotlightUI.plist"
 if [[ -r "$FLAG" ]]; then
-  /usr/bin/plutil -p "$FLAG" 2>&1
+  print "present"
 elif [[ -e "$FLAG" ]]; then
   print "present-but-not-readable-without-elevated-permission"
 else
@@ -154,17 +149,12 @@ else
   print "WritingTools.plist=absent"
 fi
 
-section "SpotlightPlus repair log (last 100 lines)"
-if [[ -f "$SUPPORT_DIR/repair.log" ]]; then
-  /usr/bin/tail -n 100 "$SUPPORT_DIR/repair.log"
-else
-  print "repair.log is missing"
-fi
-
 section "提交 Issue 时请手动填写"
 print "实际界面（旧版/新版/无界面/小型 Ask Siri）："
 print "登录后等待了多久："
-print "手动打开 Siri AI.app 后结果是否变化："
+print "能否在搜索框输入："
+print "Ask Siri / Ask Qwen 点选后的结果（答复、卡住、提示或未测试）："
+print "写作工具校对 / 千问创作是否可用："
 print "复现步骤："
 
 # Replace the home directory and short username before producing the shareable

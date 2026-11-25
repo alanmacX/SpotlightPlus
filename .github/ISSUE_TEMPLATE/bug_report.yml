@@ -1,5 +1,5 @@
-name: 新版 UI 无法显示
-description: 使用诊断报告反馈安装、开机恢复或 Assistant Island 显示问题
+name: SpotlightPlus 问题反馈
+description: 反馈安装、开机恢复、新版搜索框或 Siri 菜单项的问题
 title: "[Bug] "
 labels:
   - bug
@@ -9,7 +9,7 @@ body:
       value: |
         感谢帮助测试 SpotlightPlus。请先更新到最新版本，开机登录后等待至少三分钟再提交。
 
-        运行 `./diagnose.sh` 并检查生成的报告，然后将报告文件拖入下方。报告不会自动上传，也不会收集序列号、Apple Account、Siri 查询或系统统一日志。
+        运行 `./diagnose.sh`，检查报告后将文件拖入下方。报告不会自动上传，也不会收集序列号、Apple Account、Siri 查询或日志。
 
   - type: dropdown
     id: observed_ui
@@ -19,6 +19,7 @@ body:
         - 旧版 Spotlight
         - 没有任何界面
         - 小型 Ask Siri 界面
+        - 新版搜索框能打开，但 Ask Siri 或 Ask Qwen 没有答复
         - 新版 Assistant Island，但行为异常
         - 菜单、Dock、任务控制或 App 交互卡住
         - 其他
@@ -51,7 +52,7 @@ body:
     id: reproduce
     attributes:
       label: 复现步骤与预期结果
-      description: 请说明安装、重启、等待和触发快捷键的顺序。
+      description: 请说明安装、重启、等待和触发快捷键的顺序。若搜索框已出现，请写明能否输入、点了哪个菜单项，以及实际返回的内容。
       placeholder: |
         1. 运行 install.sh
         2. 重启并登录

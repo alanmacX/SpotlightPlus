@@ -69,3 +69,13 @@ MacAssistantIslandSessionModel.SessionError.chatServiceUnavailable
 4. 在资产和服务可用性能够独立证明之前，不调用 `startVoice`、`startListening`、`submitIslandPrompt`、Canvas 或 Thinking 测试接口。
 
 正式安装的 LaunchAgent 不会执行上述实验。它只维护已经验证过的 Enhanced Siri UI 可用性缓存。
+
+## macOS 27.3 beta 复测
+
+环境：macOS 27.3 beta（`26C5047e`），国行测试配置，SIP 开启。以下结果来自单台 Mac。
+
+新版 Spotlight 可以显示 `Ask Qwen`，但点选后没有收到千问回复。单独用经典 Siri 输入英文请求，日志记录了网页搜索回退，界面给出百度搜索结果。同一台 Mac 的写作工具「创作」用千问正确回答了算术题。这三项分别记录，方便定位问题出在哪个入口。
+
+在本地实验配置中，新版 Spotlight 与原生写作工具同时可用。校对日志显示系统加载了国行 3B 基础模型和校对 adapter，照片「消除」也加载了模型。公开的 `SystemLanguageModel` 请求仍返回 `deviceNotEligible`；从已安装资产的名称和内部版本号无法确认 3B 模型的产品代际。
+
+原生 Siri AI 会话显示不可用。系统日志里，Siri Planner 选择苹果的 PCC 云端模型后收到地区限制；这些日志没有对应到单次 `Ask Qwen` 点击。这次没有实现第三方换模，也没有把本地实验程序加入安装流程。
